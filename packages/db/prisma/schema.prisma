@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // wallet auth
+  walletPubkey String? @unique
+
+  // optional: linking to Moltbook identity
+  moltbookAgentName String?
+
+  balances Balance[]
+  matchesA Match[] @relation("MatchCreator")
+  matchesB Match[] @relation("MatchJoiner")
+}
+
+model Balance {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  currency  String   // e.g. "MALTCOIN"
+  amount    Int      @default(0)
+
+  @@unique([userId, currency])
+}
+
+enum MatchStatus {
+  OPEN
+  LOCKED
+  SETTLED
+  CANCELED
+}
+
+model Match {
+  id        String      @id @default(cuid())
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  status    MatchStatus @default(OPEN)
+  currency  String      // e.g. "MALTCOIN"
+  stake     Int
+
+  creatorId String
+  creator   User        @relation("MatchCreator", fields: [creatorId], references: [id])
+
+  joinerId  String?
+  joiner    User?       @relation("MatchJoiner", fields: [joinerId], references: [id])
+
+  winnerId  String?
+
+  // on-chain references (optional in early MVP)
+  solanaTx  String?
+}
