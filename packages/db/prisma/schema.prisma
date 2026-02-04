@@ -7,34 +7,28 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-model User {
+model Match {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // wallet auth
-  walletPubkey String? @unique
+  status    MatchStatus @default(OPEN)
 
-  // optional: linking to Moltbook identity
-  moltbookAgentName String?
+  mint      String   // MALTCOIN mint address
+  stake     Int
 
-  balances Balance[]
-  matchesA Match[] @relation("MatchCreator")
-  matchesB Match[] @relation("MatchJoiner")
-}
+  creatorPubkey String
+  joinerPubkey  String?
+  winnerPubkey  String?
 
-model Balance {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // tx signatures
+  creatorDepositTx String?
+  joinerDepositTx  String?
+  settleTx         String?
 
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  currency  String   // e.g. "MALTCOIN"
-  amount    Int      @default(0)
-
-  @@unique([userId, currency])
+  // server coinflip
+  serverSeed String?
+  serverFlip Int? // 0/1
 }
 
 enum MatchStatus {
@@ -42,25 +36,4 @@ enum MatchStatus {
   LOCKED
   SETTLED
   CANCELED
-}
-
-model Match {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  status    MatchStatus @default(OPEN)
-  currency  String      // e.g. "MALTCOIN"
-  stake     Int
-
-  creatorId String
-  creator   User        @relation("MatchCreator", fields: [creatorId], references: [id])
-
-  joinerId  String?
-  joiner    User?       @relation("MatchJoiner", fields: [joinerId], references: [id])
-
-  winnerId  String?
-
-  // on-chain references (optional in early MVP)
-  solanaTx  String?
 }
