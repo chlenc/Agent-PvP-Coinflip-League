@@ -9,5 +9,8 @@
   "scripts": {
     "dev": "npm -w apps/web run dev",
     "lint": "npm -ws run lint"
+  },
+  "devDependencies": {
+    "@solana/web3.js": "^1.98.4"
   }
 }
