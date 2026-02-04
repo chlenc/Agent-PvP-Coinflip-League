@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "npm -w apps/web run dev",
     "lint": "npm -ws run lint",
-    "maltcoin:create-mint": "tsx scripts/maltcoin.create-mint.ts"
+    "maltcoin:create-mint": "tsx scripts/maltcoin.create-mint.ts",
+    "solana:airdrop": "tsx scripts/solana.airdrop.ts"
   },
   "devDependencies": {
     "@solana/web3.js": "^1.98.4",
