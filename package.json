@@ -1,0 +1,13 @@
+{
+  "name": "agent-pvp-coinflip-league",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "programs/*"
+  ],
+  "scripts": {
+    "dev": "npm -w apps/web run dev",
+    "lint": "npm -ws run lint"
+  }
+}
