@@ -46,6 +46,12 @@ export function db() {
     CREATE INDEX IF NOT EXISTS idx_plays_agentId ON plays(agentId);
   `);
 
+  // Backfill columns for older DBs (ignore if already exists)
+  try { _db.exec('ALTER TABLE plays ADD COLUMN agentSide TEXT'); } catch {}
+  try { _db.exec('ALTER TABLE plays ADD COLUMN creatorPubkey TEXT'); } catch {}
+  try { _db.exec('ALTER TABLE plays ADD COLUMN joinerPubkey TEXT'); } catch {}
+  try { _db.exec('ALTER TABLE plays ADD COLUMN agentWon INTEGER'); } catch {}
+
   return _db;
 }
 

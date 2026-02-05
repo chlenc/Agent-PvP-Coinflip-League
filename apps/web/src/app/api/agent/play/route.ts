@@ -92,7 +92,9 @@ export async function POST(req: Request) {
   const escrowOwnerPk = new PublicKey(escrowOwner);
   const escrowAta = await getAssociatedTokenAddress(mintPk, escrowOwnerPk);
 
-  // Two ephemeral players
+  // Two ephemeral players (server simulates both sides)
+  // We still map "agentId" to one side so humans can understand who "won".
+  const agentSide: 'creator' | 'joiner' = 'creator';
   const creator = Keypair.generate();
   const joiner = Keypair.generate();
 
@@ -178,6 +180,8 @@ export async function POST(req: Request) {
   const h = crypto.createHash('sha256').update(seed + ':' + matchId).digest();
   const flip = h[0] % 2;
   const winnerPubkey = flip === 0 ? creator.publicKey.toBase58() : joiner.publicKey.toBase58();
+  const agentPubkey = agentSide === 'creator' ? creator.publicKey.toBase58() : joiner.publicKey.toBase58();
+  const agentWon = winnerPubkey === agentPubkey;
   db()
     .prepare('UPDATE matches SET serverSeed=?, serverFlip=?, winnerPubkey=?, updatedAt=? WHERE id=?')
     .run(seed, flip, winnerPubkey, new Date().toISOString(), matchId);
@@ -201,8 +205,14 @@ export async function POST(req: Request) {
   // record play for tracking unique external agents
   db()
     .prepare(
-      `INSERT INTO plays (id, createdAt, agentId, agentMaltbook, agentTelegram, agentPubkey, ref, matchId)
-       VALUES (@id, @createdAt, @agentId, @agentMaltbook, @agentTelegram, @agentPubkey, @ref, @matchId)`
+      `INSERT INTO plays (
+         id, createdAt, agentId, agentMaltbook, agentTelegram, agentPubkey, ref, matchId,
+         agentSide, creatorPubkey, joinerPubkey, agentWon
+       )
+       VALUES (
+         @id, @createdAt, @agentId, @agentMaltbook, @agentTelegram, @agentPubkey, @ref, @matchId,
+         @agentSide, @creatorPubkey, @joinerPubkey, @agentWon
+       )`
     )
     .run({
       id: cuid(),
@@ -213,6 +223,10 @@ export async function POST(req: Request) {
       agentPubkey: parsed.data?.pubkey ?? null,
       ref: parsed.data?.ref ?? null,
       matchId,
+      agentSide,
+      creatorPubkey: creator.publicKey.toBase58(),
+      joinerPubkey: joiner.publicKey.toBase58(),
+      agentWon: agentWon ? 1 : 0,
     });
 
   return NextResponse.json({
@@ -222,8 +236,17 @@ export async function POST(req: Request) {
     mint,
     cluster,
     stake,
-    winnerPubkey,
     flip,
+    participants: {
+      creatorPubkey: creator.publicKey.toBase58(),
+      joinerPubkey: joiner.publicKey.toBase58(),
+    },
+    agent: {
+      side: agentSide,
+      pubkey: agentPubkey,
+      won: agentWon,
+    },
+    winnerPubkey,
     tx: {
       fundCreator,
       fundJoiner,
