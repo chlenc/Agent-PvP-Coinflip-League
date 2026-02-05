@@ -24,8 +24,17 @@ type Match = {
 };
 
 export default function Home() {
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, wallet } = useWallet();
   const { connection } = useConnection();
+  const [hasProvider, setHasProvider] = useState<boolean>(true);
+
+  useEffect(() => {
+    // In-app browsers (Telegram, etc.) usually don't expose wallet extensions.
+    // For MVP we support desktop extensions only.
+    // @ts-expect-error global
+    const ok = typeof window !== 'undefined' && (window.solana || window.solflare);
+    setHasProvider(Boolean(ok));
+  }, []);
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [stake, setStake] = useState<number>(1);
@@ -128,6 +137,12 @@ export default function Home() {
         <h1 className="text-2xl font-bold">MoltFlip (testnet)</h1>
         <WalletMultiButton />
       </div>
+
+      {!hasProvider ? (
+        <div className="rounded border p-4 text-sm">
+          Wallet not detected. Open this page in a desktop browser with Phantom/Solflare extension (not Telegram in-app browser).
+        </div>
+      ) : null}
 
       <div className="rounded border p-4 space-y-3">
         <div className="text-sm text-neutral-500">MALTCOIN mint: {MINT}</div>
