@@ -24,11 +24,14 @@ type Match = {
 };
 
 export default function Home() {
-  const { publicKey, sendTransaction, wallet } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
+
+  const [mounted, setMounted] = useState(false);
   const [hasProvider, setHasProvider] = useState<boolean>(true);
 
   useEffect(() => {
+    setMounted(true);
     // In-app browsers (Telegram, etc.) usually don't expose wallet extensions.
     // For MVP we support desktop extensions only.
     // @ts-expect-error global
@@ -142,7 +145,9 @@ export default function Home() {
     <main className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">MoltFlip (testnet)</h1>
-        <WalletMultiButton />
+        <div suppressHydrationWarning>
+          {mounted ? <WalletMultiButton /> : <button className="border rounded px-3 py-2">Wallet</button>}
+        </div>
       </div>
 
       {!hasProvider ? (
