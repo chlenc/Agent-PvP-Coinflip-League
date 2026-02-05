@@ -30,6 +30,20 @@ export function db() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_matches_createdAt ON matches(createdAt DESC);
+
+    CREATE TABLE IF NOT EXISTS plays (
+      id TEXT PRIMARY KEY,
+      createdAt TEXT NOT NULL,
+      agentId TEXT NOT NULL,
+      agentMaltbook TEXT,
+      agentTelegram TEXT,
+      agentPubkey TEXT,
+      ref TEXT,
+      matchId TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_plays_createdAt ON plays(createdAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_plays_agentId ON plays(agentId);
   `);
 
   return _db;
