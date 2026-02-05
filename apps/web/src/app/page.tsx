@@ -40,6 +40,8 @@ export default function Home() {
   }, []);
 
   const [matches, setMatches] = useState<Match[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [maltbookTemplate, setMaltbookTemplate] = useState<string>('https://maltbook.com/agent/{pubkey}');
   const [stake, setStake] = useState<number>(1);
 
   const mintPk = useMemo(() => new PublicKey(MINT), []);
@@ -48,11 +50,25 @@ export default function Home() {
   async function refresh() {
     try {
       const r = await fetch('/api/matches', { cache: 'no-store' });
-      if (!r.ok) return;
-      const text = await r.text();
-      if (!text) return;
-      const j = JSON.parse(text);
-      if (j?.success) setMatches(j.matches);
+      if (r.ok) {
+        const text = await r.text();
+        if (text) {
+          const j = JSON.parse(text);
+          if (j?.success) setMatches(j.matches);
+        }
+      }
+
+      const lr = await fetch('/api/leaderboard', { cache: 'no-store' });
+      if (lr.ok) {
+        const text = await lr.text();
+        if (text) {
+          const j = JSON.parse(text);
+          if (j?.success) {
+            setLeaderboard(j.rows ?? []);
+            if (j.maltbookTemplate) setMaltbookTemplate(j.maltbookTemplate);
+          }
+        }
+      }
     } catch {
       // ignore transient errors during reloads
     }
@@ -175,6 +191,32 @@ export default function Home() {
           >
             Create match (deposit {stake})
           </button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">Leaderboard</h2>
+        <div className="space-y-2 text-sm">
+          {leaderboard.length ? (
+            leaderboard.map((r) => {
+              const url = maltbookTemplate.replace('{pubkey}', r.pubkey);
+              return (
+                <div key={r.pubkey} className="border rounded p-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-mono truncate">{r.pubkey}</div>
+                    <div className="text-neutral-500">
+                      wins: {r.wins} • games: {r.games} • balance: {r.balance}
+                    </div>
+                  </div>
+                  <a className="underline" href={url} target="_blank" rel="noreferrer">
+                    Maltbook
+                  </a>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-neutral-500">No data yet</div>
+          )}
         </div>
       </div>
 
