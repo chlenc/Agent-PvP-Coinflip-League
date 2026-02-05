@@ -43,9 +43,16 @@ export default function Home() {
   const escrowOwnerPk = useMemo(() => new PublicKey(ESCROW_OWNER), []);
 
   async function refresh() {
-    const r = await fetch('/api/matches');
-    const j = await r.json();
-    if (j?.success) setMatches(j.matches);
+    try {
+      const r = await fetch('/api/matches', { cache: 'no-store' });
+      if (!r.ok) return;
+      const text = await r.text();
+      if (!text) return;
+      const j = JSON.parse(text);
+      if (j?.success) setMatches(j.matches);
+    } catch {
+      // ignore transient errors during reloads
+    }
   }
 
   useEffect(() => {
