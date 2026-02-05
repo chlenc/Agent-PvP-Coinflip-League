@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
 
 const Deposit = z.object({
   role: z.enum(['creator', 'joiner']),
@@ -15,13 +15,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await prisma.match.findUnique({ where: { id } });
+  const match = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
   if (!match) return NextResponse.json({ success: false, error: 'not_found' }, { status: 404 });
 
-  const data: any = {};
-  if (parsed.data.role === 'creator') data.creatorDepositTx = parsed.data.tx;
-  if (parsed.data.role === 'joiner') data.joinerDepositTx = parsed.data.tx;
+  const now = new Date().toISOString();
+  const field = parsed.data.role === 'creator' ? 'creatorDepositTx' : 'joinerDepositTx';
 
-  const updated = await prisma.match.update({ where: { id }, data });
+  db()
+    .prepare(`UPDATE matches SET ${field}=?, updatedAt=? WHERE id=?`)
+    .run(parsed.data.tx, now, id);
+
+  const updated = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
   return NextResponse.json({ success: true, match: updated });
 }

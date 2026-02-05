@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
 
 const Join = z.object({
   joinerPubkey: z.string(),
@@ -15,20 +15,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await prisma.match.findUnique({ where: { id } });
+  const match = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
   if (!match) return NextResponse.json({ success: false, error: 'not_found' }, { status: 404 });
   if (match.status !== 'OPEN') {
     return NextResponse.json({ success: false, error: 'match_not_open' }, { status: 400 });
   }
 
-  const updated = await prisma.match.update({
-    where: { id },
-    data: {
-      joinerPubkey: parsed.data.joinerPubkey,
-      joinerDepositTx: parsed.data.joinerDepositTx ?? null,
-      status: 'LOCKED',
-    },
-  });
+  const now = new Date().toISOString();
+  db()
+    .prepare(
+      'UPDATE matches SET joinerPubkey=?, joinerDepositTx=?, status=?, updatedAt=? WHERE id=?'
+    )
+    .run(parsed.data.joinerPubkey, parsed.data.joinerDepositTx ?? null, 'LOCKED', now, id);
 
+  const updated = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
   return NextResponse.json({ success: true, match: updated });
 }

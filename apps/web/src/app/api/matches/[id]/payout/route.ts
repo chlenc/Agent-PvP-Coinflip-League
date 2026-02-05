@@ -14,7 +14,7 @@ import {
   getOrCreateAssociatedTokenAccount,
   createTransferInstruction,
 } from '@solana/spl-token';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
 
 const Payout = z.object({
   // optional override
@@ -35,7 +35,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await prisma.match.findUnique({ where: { id } });
+  const match = db().prepare('SELECT * FROM matches WHERE id=?').get(id) as any;
   if (!match) return NextResponse.json({ success: false, error: 'not_found' }, { status: 404 });
   if (!match.winnerPubkey) {
     return NextResponse.json({ success: false, error: 'winner_not_set' }, { status: 400 });
@@ -69,13 +69,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     commitment: 'confirmed',
   });
 
-  const updated = await prisma.match.update({
-    where: { id },
-    data: {
-      settleTx: sig,
-      status: 'SETTLED',
-    },
-  });
+  const now = new Date().toISOString();
+  db()
+    .prepare('UPDATE matches SET settleTx=?, status=?, updatedAt=? WHERE id=?')
+    .run(sig, 'SETTLED', now, id);
 
+  const updated = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
   return NextResponse.json({ success: true, match: updated, tx: sig });
 }

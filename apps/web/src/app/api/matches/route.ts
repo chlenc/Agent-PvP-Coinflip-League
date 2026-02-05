@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
+import { db, cuid } from '@/lib/db';
 
 const CreateMatch = z.object({
   mint: z.string(),
@@ -9,11 +9,10 @@ const CreateMatch = z.object({
 });
 
 export async function GET() {
-  const matches = await prisma.match.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  });
-  return NextResponse.json({ success: true, matches });
+  const rows = db()
+    .prepare('SELECT * FROM matches ORDER BY createdAt DESC LIMIT 50')
+    .all();
+  return NextResponse.json({ success: true, matches: rows });
 }
 
 export async function POST(req: Request) {
@@ -23,14 +22,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const m = await prisma.match.create({
-    data: {
+  const id = cuid();
+  const now = new Date().toISOString();
+
+  db()
+    .prepare(
+      `INSERT INTO matches (id, createdAt, updatedAt, status, mint, stake, creatorPubkey)
+       VALUES (@id, @createdAt, @updatedAt, @status, @mint, @stake, @creatorPubkey)`
+    )
+    .run({
+      id,
+      createdAt: now,
+      updatedAt: now,
+      status: 'OPEN',
       mint: parsed.data.mint,
       stake: parsed.data.stake,
       creatorPubkey: parsed.data.creatorPubkey,
-      status: 'OPEN',
-    },
-  });
+    });
 
-  return NextResponse.json({ success: true, match: m });
+  const match = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
+  return NextResponse.json({ success: true, match });
 }

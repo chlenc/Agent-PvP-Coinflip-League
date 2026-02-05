@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import crypto from 'node:crypto';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
 
 const Settle = z.object({
   serverSeed: z.string().optional(),
@@ -15,7 +15,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const match = await prisma.match.findUnique({ where: { id } });
+  const match = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
   if (!match) return NextResponse.json({ success: false, error: 'not_found' }, { status: 404 });
   if (match.status !== 'LOCKED') {
     return NextResponse.json({ success: false, error: 'match_not_locked' }, { status: 400 });
@@ -29,15 +29,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const flip = h[0] % 2; // 0 => creator, 1 => joiner
   const winnerPubkey = flip === 0 ? match.creatorPubkey : match.joinerPubkey;
 
-  const updated = await prisma.match.update({
-    where: { id },
-    data: {
-      serverSeed: seed,
-      serverFlip: flip,
-      winnerPubkey,
-      // settleTx will be written after on-chain transfer is done
-    },
-  });
+  const now = new Date().toISOString();
+  db()
+    .prepare('UPDATE matches SET serverSeed=?, serverFlip=?, winnerPubkey=?, updatedAt=? WHERE id=?')
+    .run(seed, flip, winnerPubkey, now, id);
 
+  const updated = db().prepare('SELECT * FROM matches WHERE id=?').get(id);
   return NextResponse.json({ success: true, match: updated });
 }
