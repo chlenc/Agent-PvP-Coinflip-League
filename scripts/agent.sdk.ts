@@ -68,6 +68,27 @@ function loadKeypair(filePath: string): Keypair {
   return Keypair.fromSecretKey(secret);
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function withRetry<T>(fn: () => Promise<T>, label: string, tries = 6): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      lastErr = e;
+      const msg = String(e?.message ?? e);
+      const is429 = msg.includes('429') || msg.toLowerCase().includes('too many requests');
+      const delay = Math.min(10_000, 500 * Math.pow(2, i));
+      if (!is429 || i === tries - 1) throw e;
+      await sleep(delay);
+    }
+  }
+  throw lastErr;
+}
+
 async function http<T>(base: string, p: string, init?: RequestInit): Promise<T> {
   const r = await fetch(base + p, {
     ...init,
@@ -111,12 +132,18 @@ export async function runMoltflipMatch(baseUrl: string, opts: MoltflipRunOptions
   const fundCreatorTx = new Transaction().add(
     createTransferInstruction(authAta.address, creatorAta.address, authority.publicKey, BigInt(stake * fundMult))
   );
-  const fundCreator = await sendAndConfirmTransaction(connection, fundCreatorTx, [authority], { commitment: 'confirmed' });
+  const fundCreator = await withRetry(
+    () => sendAndConfirmTransaction(connection, fundCreatorTx, [authority], { commitment: 'confirmed' }),
+    'fundCreator'
+  );
 
   const fundJoinerTx = new Transaction().add(
     createTransferInstruction(authAta.address, joinerAta.address, authority.publicKey, BigInt(stake * fundMult))
   );
-  const fundJoiner = await sendAndConfirmTransaction(connection, fundJoinerTx, [authority], { commitment: 'confirmed' });
+  const fundJoiner = await withRetry(
+    () => sendAndConfirmTransaction(connection, fundJoinerTx, [authority], { commitment: 'confirmed' }),
+    'fundJoiner'
+  );
 
   const created = await http<any>(baseUrl, '/api/matches', {
     method: 'POST',
@@ -129,12 +156,12 @@ export async function runMoltflipMatch(baseUrl: string, opts: MoltflipRunOptions
       createTransferInstruction(fromAtaAddr, escrowAta, from.publicKey, BigInt(stake))
     );
     tx.feePayer = authority.publicKey;
-    tx.recentBlockhash = (await connection.getLatestBlockhash('confirmed')).blockhash;
+    tx.recentBlockhash = (await withRetry(() => connection.getLatestBlockhash('confirmed'), 'getLatestBlockhash')).blockhash;
     tx.partialSign(authority);
     tx.partialSign(from);
 
-    const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false });
-    await connection.confirmTransaction(sig, 'confirmed');
+    const sig = await withRetry(() => connection.sendRawTransaction(tx.serialize(), { skipPreflight: false }), 'sendRawTransaction');
+    await withRetry(() => connection.confirmTransaction(sig, 'confirmed'), 'confirmTransaction');
 
     await http<any>(baseUrl, `/api/matches/${matchId}/deposit`, {
       method: 'POST',
