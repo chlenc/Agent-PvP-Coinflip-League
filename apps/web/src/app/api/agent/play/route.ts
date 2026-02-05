@@ -99,9 +99,19 @@ export async function POST(req: Request) {
   const joiner = Keypair.generate();
 
   // Fund players with tokens from authority (authority pays fees)
-  const authAta = await withRetry(() => getOrCreateAssociatedTokenAccount(connection, authority, mintPk, authority.publicKey));
-  const creatorAta = await withRetry(() => getOrCreateAssociatedTokenAccount(connection, authority, mintPk, creator.publicKey));
-  const joinerAta = await withRetry(() => getOrCreateAssociatedTokenAccount(connection, authority, mintPk, joiner.publicKey));
+  // NOTE: getOrCreateAssociatedTokenAccount can sometimes fail on devnet; wrap with retries.
+  const authAta = await withRetry(
+    () => getOrCreateAssociatedTokenAccount(connection, authority, mintPk, authority.publicKey),
+    12
+  );
+  const creatorAta = await withRetry(
+    () => getOrCreateAssociatedTokenAccount(connection, authority, mintPk, creator.publicKey),
+    12
+  );
+  const joinerAta = await withRetry(
+    () => getOrCreateAssociatedTokenAccount(connection, authority, mintPk, joiner.publicKey),
+    12
+  );
 
   const fundAmount = BigInt(stake * 3);
 
